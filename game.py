@@ -1,6 +1,7 @@
+import time
+from enum import Enum, auto
 import pygame
 import os
-
 import worldbuild
 import pov
 
@@ -8,13 +9,18 @@ COORDINATES = 1000
 FPS = 60
 SACREDCOW = 19
 ZONES = 33
+GRID_STEP = 50
+PIXEL_STEP = GRID_STEP // 10
+HOSC = (SACREDCOW - 1) // 2
+CLUBTWENTYWHAT = 25
+ANIMATION = 10
 
-colours = {
-    'violet': (205, 205, 255),
-    'gold': (255, 190, 0),
-    'cyan': (0, 165, 185),
-    'black': (0, 0, 0)
-}
+# colours = {
+#     'violet': (205, 205, 255),
+#     'gold': (255, 190, 0),
+#     'cyan': (0, 165, 185),
+#     'black': (0, 0, 0)
+# }
 
 pygame.init()
 pygame.mixer.init()
@@ -33,104 +39,110 @@ hole_img = pygame.image.load(os.path.join(img_folder, 'hole.png')).convert()
 world = worldbuild.worldbuild(ZONES)
 
 
-def pos_50(pos):
-    return pos[0] // 50, pos[1] // 50
+# def pos_50(pos):
+#     return pos[0] // 50, pos[1] // 50
 
 
 subwalls = ['hole', 'box']
 
-# def playerfinder(w):
-#     l = []
-#     for y, line in enumerate(w):
-#         if 'player' in line:
-#             for x, obj in enumerate(line):
-#                 if obj == 'player':
-#                     l = [y, x]
-#                     break
-#             break
-#     return l
-# Не нравится, что player взаимодействует с world
 
 tmp_pos = [1, 1]  # YX
 
 
-# world[tmp_pos[1]][tmp_pos[0]] = 'player'  # YX
-# Не нравится, что player взаимодействует с world
+class PlayerState(Enum):
+    IDLE = auto()
+    LEFT = auto()
+    RIGHT = auto()
+    UP = auto()
+    DOWN = auto()
+
+
+def to_yx(xy: pygame.Rect):
+    x, y = xy.topleft
+    x = (x - 25) // GRID_STEP
+    y = (y - 25) // GRID_STEP
+    return y, x
 
 
 class Player(pygame.sprite.Sprite):
+    @staticmethod
+    def coors_to_screen(inner_pos):
+        if inner_pos[1] < HOSC and inner_pos[0] < HOSC:  # LU
+            return 50 * inner_pos[1] + 25, 50 * inner_pos[0] + 25
+        elif ZONES - HOSC > inner_pos[1] >= HOSC > inner_pos[0]:  # CU
+            return 50 * HOSC + 25, 50 * inner_pos[0] + 25
+        elif ZONES - HOSC <= inner_pos[1] and inner_pos[0] < HOSC:  # RU
+            return 50 * (inner_pos[1] + SACREDCOW - ZONES) + 25, 50 * inner_pos[0] + 25
+        elif inner_pos[1] < HOSC <= inner_pos[0] < ZONES - HOSC:  # LС
+            return 50 * inner_pos[1] + 25, 50 * HOSC + 25
+        elif inner_pos[1] >= ZONES - HOSC > inner_pos[0] >= HOSC:  # RC
+            return 50 * (inner_pos[1] + SACREDCOW - ZONES) + 25, 50 * HOSC + 25
+        elif inner_pos[1] < HOSC and ZONES - HOSC <= inner_pos[0]:  # LD
+            return 50 * inner_pos[1] + 25, 50 * (inner_pos[0] + SACREDCOW - ZONES) + 25
+        elif HOSC <= inner_pos[1] < ZONES - HOSC <= inner_pos[0]:  # CD
+            return 50 * HOSC + 25, 50 * (inner_pos[0] + SACREDCOW - ZONES) + 25
+        elif ZONES - HOSC <= inner_pos[1] and ZONES - HOSC <= inner_pos[0]:  # RD
+            return 50 * (inner_pos[1] + SACREDCOW - ZONES) + 25, 50 * (inner_pos[0] + SACREDCOW - ZONES) + 25
+        else:  # CC
+            return 50 * HOSC + 25, 50 * HOSC + 25
+
     def __init__(self):
         pygame.sprite.Sprite.__init__(self)
         self.image = player_img
-        # self.image.set_colorkey(colours['black'])
-        # Пока не нужно
         self.rect = self.image.get_rect()
-
-        hosc = (SACREDCOW - 1) // 2
-
-        if tmp_pos[1] < hosc and tmp_pos[0] < hosc:  # LU
-            self.rect.topleft = (50 * tmp_pos[1] + 25, 50 * tmp_pos[0] + 25)
-        elif ZONES - hosc > tmp_pos[1] >= hosc > tmp_pos[0]:  # CU
-            self.rect.topleft = (50 * hosc + 25, 50 * tmp_pos[0] + 25)
-        elif ZONES - hosc <= tmp_pos[1] and tmp_pos[0] < hosc:  # RU
-            self.rect.topleft = (50 * (tmp_pos[1] + SACREDCOW - ZONES) + 25, 50 * tmp_pos[0] + 25)
-        elif tmp_pos[1] < hosc <= tmp_pos[0] < ZONES - hosc:  # LС
-            self.rect.topleft = (50 * tmp_pos[1] + 25, 50 * hosc + 25)
-        elif tmp_pos[1] >= ZONES - hosc > tmp_pos[0] >= hosc:  # RC
-            self.rect.topleft = (50 * (tmp_pos[1] + SACREDCOW - ZONES) + 25, 50 * hosc + 25)
-        elif tmp_pos[1] < hosc and ZONES - hosc <= tmp_pos[0]:  # LD
-            self.rect.topleft = (50 * tmp_pos[1] + 25, 50 * (tmp_pos[0] + SACREDCOW - ZONES) + 25)
-        elif hosc <= tmp_pos[1] < ZONES - hosc <= tmp_pos[0]:  # CD
-            self.rect.topleft = (50 * hosc + 25, 50 * (tmp_pos[0] + SACREDCOW - ZONES) + 25)
-        elif ZONES - hosc <= tmp_pos[1] and ZONES - hosc <= tmp_pos[0]:  # RD
-            self.rect.topleft = (50 * (tmp_pos[1] + SACREDCOW - ZONES) + 25, 50 * (tmp_pos[0] + SACREDCOW - ZONES) + 25)
-        else:  # CC
-            self.rect.topleft = (50 * hosc + 25, 50 * hosc + 25)
-
         self.surf = pygame.Surface((50, 50))
+        self.rect.topleft = (75, 75)
+        self.next_pos = self.rect
+        self.player_state = PlayerState.IDLE
+        self.delta = pygame.math.Vector2(0, 0)
+        self.next_vec = pygame.math.Vector2(self.rect.topleft)
+        self.i = 0
+
+    def move_once(self):
+        x, y = self.delta.xy
+        x = int(x)
+        y = int(y)
+        self.rect = self.rect.move(x, y)
+        if self.i == 0:
+            self.player_state = PlayerState.IDLE
+            global tmp_pos
+            tmp_pos = self.next_pos
+            self.delta = pygame.math.Vector2(0, 0)
+        else:
+            self.i -= 1
+        # if pygame.math.Vector2(*self.rect.topleft) == self.next_vec:
 
     def update(self):
-        def moving(zeroth, first):
-            to_check = world[tmp_pos[0] + zeroth][tmp_pos[1] + first]
-            if not (to_check in subwalls or to_check == 'wall'):
-                if zeroth:
-                    pos_y = self.rect.topleft[1] + zeroth * 50
-                    pos_y_moving = self.rect.topleft[1]
-                    while not self.rect.topleft[1] == pos_y:
-                        pos_y_moving += zeroth * 2
-                        self.rect.topleft = (self.rect.topleft[0], pos_y_moving)
-                        pygame.display.flip()
-                        # pygame.draw.rect(screen, colours['violet'], (self.rect.topright[0] - 2, self.rect.topright[1], 50, 50))
-                        # это было временное решение
-                else:
-                    pos_x = self.rect.topleft[0] + first * 50
-                    pos_x_moving = self.rect.topleft[0]
-                    while not self.rect.topleft[0] == pos_x:
-                        pos_x_moving += first * 2
-                        self.rect.topleft = (pos_x_moving, self.rect.topleft[1])
-                        pygame.display.flip()
-                        # pygame.draw.rect(screen, colours['violet'], (self.rect.topright[0] - 2, self.rect.topright[1], 50, 50))
-                        # это было временное решение
+        if self.player_state == PlayerState.IDLE:
+            keystate = pygame.key.get_pressed()
 
-                tmp_pos[0] += zeroth  # YX
-                tmp_pos[1] += first  # YX
-                # world[tmp_pos[0]][tmp_pos[1]] = 'floor'  # YX
-                # world[tmp_pos[0]][tmp_pos[1]] = 'player'  # YX
-                # Не нравится, что player взаимодействует с world
+            next_pos = tmp_pos[:]
+            if keystate[pygame.K_a]:
+                self.player_state = PlayerState.LEFT
+                next_pos[1] -= 1
+            elif keystate[pygame.K_d]:
+                self.player_state = PlayerState.RIGHT
+                next_pos[1] += 1
+            elif keystate[pygame.K_s]:
+                self.player_state = PlayerState.DOWN
+                next_pos[0] += 1
+            elif keystate[pygame.K_w]:
+                self.player_state = PlayerState.UP
+                next_pos[0] -= 1
 
-        keystate = pygame.key.get_pressed()
-
-        if keystate[pygame.K_a]:
-            moving(0, -1)
-
-        if keystate[pygame.K_d]:
-            moving(0, 1)
-
-        if keystate[pygame.K_s]:
-            moving(1, 0)
-
-        if keystate[pygame.K_w]:
-            moving(-1, 0)
+            # next_pos = self.rect.move(*step_dict[self.player_state])
+            y, x = next_pos
+            to_check = world[y][x]
+            if to_check in subwalls or to_check == 'wall':
+                self.player_state = PlayerState.IDLE
+            else:
+                self.next_pos = next_pos
+                self.next_vec = pygame.math.Vector2(*self.coors_to_screen(next_pos))
+                curr_vec = pygame.math.Vector2(*self.rect.topleft)
+                self.delta = (self.next_vec - curr_vec) / ANIMATION
+                self.i = ANIMATION - 1
+        else:
+            self.move_once()
 
 
 class Wall(pygame.sprite.Sprite):
@@ -138,14 +150,11 @@ class Wall(pygame.sprite.Sprite):
         pygame.sprite.Sprite.__init__(self)
         self.image = wall_img
         self.rect = self.image.get_rect()
-        self.rect.topleft = (x * 50 + clubtwentywhat, y * 50 + clubtwentywhat)
+        self.rect.topleft = (x * 50 + CLUBTWENTYWHAT, y * 50 + CLUBTWENTYWHAT)
         self.surf = pygame.Surface((50, 50))
 
     def update(self):
         pass
-
-
-clubtwentywhat = 25
 
 
 class Box(pygame.sprite.Sprite):
@@ -153,7 +162,7 @@ class Box(pygame.sprite.Sprite):
         pygame.sprite.Sprite.__init__(self)
         self.image = box_img
         self.rect = self.image.get_rect()
-        self.rect.topleft = (x * 50 + clubtwentywhat, y * 50 + clubtwentywhat)
+        self.rect.topleft = (x * 50 + CLUBTWENTYWHAT, y * 50 + CLUBTWENTYWHAT)
         self.surf = pygame.Surface((50, 50))
 
     def update(self):
@@ -165,7 +174,7 @@ class Floor(pygame.sprite.Sprite):
         pygame.sprite.Sprite.__init__(self)
         self.image = floor_img
         self.rect = self.image.get_rect()
-        self.rect.topleft = (x * 50 + clubtwentywhat, y * 50 + clubtwentywhat)
+        self.rect.topleft = (x * 50 + CLUBTWENTYWHAT, y * 50 + CLUBTWENTYWHAT)
         self.surf = pygame.Surface((50, 50))
 
     def update(self):
@@ -177,7 +186,7 @@ class Hole(pygame.sprite.Sprite):
         pygame.sprite.Sprite.__init__(self)
         self.image = hole_img
         self.rect = self.image.get_rect()
-        self.rect.topleft = (x * 50 + clubtwentywhat, y * 50 + clubtwentywhat)
+        self.rect.topleft = (x * 50 + CLUBTWENTYWHAT, y * 50 + CLUBTWENTYWHAT)
         self.surf = pygame.Surface((50, 50))
 
     def update(self):
@@ -196,9 +205,11 @@ def group():
                 all_sprites.add(Floor(x, y))
             if place == 'hole':
                 all_sprites.add(Hole(x, y))
-    all_sprites.add(Player())
+    # all_sprites.add(Player())
     return all_sprites
 
+playersprite = pygame.sprite.Group()
+playersprite.add(Player())
 
 running = True
 while running:
@@ -209,8 +220,9 @@ while running:
 
     group().update()
     group().draw(screen)
+    playersprite.update()
+    playersprite.draw(screen)
 
-    # screen.fill(colours['violet'])
     pygame.display.flip()
 
 pygame.quit()
