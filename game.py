@@ -46,21 +46,22 @@ class Game:
         self.i = ANIMATION
         self.pos = np.array([1, 1])
         self.region = self.getregion(self.pos)
+        self.next_region = self.getregion(self.pos)
 
     def step(self):
         self.ambientsprites.update()
         self.ambientsprites.draw(screen)
         self.playersprite.update()
         self.playersprite.draw(screen)
-        # pygame.draw.rect(screen, (237, 216, 255), (0, 0, 25, 1000))
-        # pygame.draw.rect(screen, (237, 216, 255), (0, 0, 1000, 25))
-        # pygame.draw.rect(screen, (237, 216, 255), (25, 1000, 0, 0))
-        # pygame.draw.rect(screen, (237, 216, 255), (1000, 25, 0, 0))
+        pygame.draw.rect(screen, (237, 216, 255), (0, 0, 25, 1000))
+        pygame.draw.rect(screen, (237, 216, 255), (0, 0, 1000, 25))
+        pygame.draw.rect(screen, (237, 216, 255), (975, 0, 1000, 1000))
+        pygame.draw.rect(screen, (237, 216, 255), (0, 975, 1000, 1000))
         pygame.display.flip()
 
     def getnextstate(self):
         keystate = pygame.key.get_pressed()
-        print(self.region, self.pos)
+        # print(self.region, self.pos)
         if keystate[pygame.K_a]:
             self.state = PlayerState.LEFT
         elif keystate[pygame.K_d]:
@@ -90,6 +91,7 @@ class Game:
                 else:
                     self.region = self.getregion(self.pos)
                     self.pos += Dir[self.state]
+                    self.next_region = self.getregion(self.pos)
                 self.i = ANIMATION
             else:
                 self.step()
@@ -119,19 +121,19 @@ class Game:
     def getregion(inner_pos):
         if inner_pos[0] < HOSC and inner_pos[1] < HOSC:
             return ZoneType.LU
-        elif ZONES - HOSC - 1 > inner_pos[0] >= HOSC > inner_pos[1]:
+        elif ZONES - HOSC > inner_pos[0] >= HOSC > inner_pos[1]:
             return ZoneType.CU
-        elif ZONES - HOSC - 1 <= inner_pos[0] and inner_pos[1] < HOSC:
+        elif ZONES - HOSC <= inner_pos[0] and inner_pos[1] < HOSC:
             return ZoneType.RU
-        elif inner_pos[0] < HOSC <= inner_pos[1] < ZONES - HOSC - 1:
+        elif inner_pos[0] < HOSC <= inner_pos[1] < ZONES - HOSC:
             return ZoneType.LC
-        elif inner_pos[0] >= ZONES - HOSC - 1 > inner_pos[1] >= HOSC:
+        elif inner_pos[0] >= ZONES - HOSC > inner_pos[1] >= HOSC:
             return ZoneType.RC
-        elif inner_pos[0] < HOSC and ZONES - HOSC - 1 <= inner_pos[1]:
+        elif inner_pos[0] < HOSC and ZONES - HOSC <= inner_pos[1]:
             return ZoneType.LD
-        elif HOSC <= inner_pos[0] < ZONES - HOSC - 1 <= inner_pos[1]:
+        elif HOSC <= inner_pos[0] < ZONES - HOSC <= inner_pos[1]:
             return ZoneType.CD
-        elif ZONES - HOSC - 1 <= inner_pos[0] and ZONES - HOSC - 1 <= inner_pos[1]:
+        elif ZONES - HOSC <= inner_pos[0] and ZONES - HOSC <= inner_pos[1]:
             return ZoneType.RD
         else:
             return ZoneType.CC
@@ -162,6 +164,7 @@ Dir = {
     PlayerState.RIGHT: np.array([1, 0]),
         }
 
+
 class ZoneType(Enum):
     LU = auto()
     CU = auto()
@@ -187,15 +190,23 @@ class MovableSprite(ABC, pygame.sprite.Sprite):
         self.rect = self.rect.move(x, y)
 
     @abstractmethod
-    def getvector(self, region, state):
+    def get_local_relative_shift(self, region, state):
         pass
+
+    def get_relative_shift(self, region, next_region, state):
+        if region == next_region \
+                or (region in self.corners and next_region != region) \
+                or (region != next_region and next_region == ZoneType.CC):
+            return self.get_local_relative_shift(region, state)
+        else:
+            return self.get_local_relative_shift(next_region, state)
 
     corners = (ZoneType.LU, ZoneType.RU, ZoneType.RD, ZoneType.LD)
     sides_x = (ZoneType.RC, ZoneType.LC)
     sides_y = (ZoneType.CU, ZoneType.CD)
 
     def update(self):
-        vector = self.getvector(self.game.region, self.game.state)
+        vector = self.get_relative_shift(self.game.region, self.game.next_region, self.game.state)
         self.move_once(vector)
 
 
@@ -207,7 +218,7 @@ class Player(MovableSprite):
         self.surf = pygame.Surface((50, 50))
         self.rect.topleft = (75, 75)
 
-    def getvector(self, region, state):
+    def get_local_relative_shift(self, region, state):
         vector = single_step_dict[state].copy()
         if region in MovableSprite.sides_x:
             vector *= np.array([1, 0])
@@ -219,7 +230,7 @@ class Player(MovableSprite):
 
 
 class AmbientSprite(MovableSprite):
-    def getvector(self, region, state):
+    def get_local_relative_shift(self, region, state):
         vector = -(single_step_dict[state].copy())
         if region in MovableSprite.sides_x:
             vector *= np.array([0, 1])
