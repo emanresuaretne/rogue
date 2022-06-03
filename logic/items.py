@@ -24,10 +24,9 @@ class Frame(pygame.sprite.Sprite):
         if index is None:
             self.image.set_alpha(0)
         else:
-            self.rect.topleft = ((index + 2) * 50 + 25, 25)
+            self.rect.topleft = ((index + 8) * 50 + 25, 25)
             self.image.set_colorkey((255, 255, 255))
             self.image.set_alpha(255)
-
 
     def get_image(self):
         return pygame.image.load(sprites.img_folder / "frame.png").convert()
@@ -75,7 +74,7 @@ class Inventory:
         self.max_slots *= 2
 
     def place_sprite_at(self, sprite, i):
-        sprite.rect.topleft = ((i + 2) * 50 + 25, 25)
+        sprite.rect.topleft = ((i + 8) * 50 + 25, 25)
         sprite.image.set_alpha(255)
 
 
@@ -87,20 +86,6 @@ class Item(abc.ABC):
 
     @abc.abstractmethod
     def get_sprite(self):
-        pass
-
-
-class Weapon(Item):
-    def __init__(self, name, description, ap, range, damage):
-        super().__init__(name, description)
-        self.ap = ap
-        self.range = range
-        self.damage = damage
-
-
-class Consumable(Item):
-    @abc.abstractmethod
-    def consume(self, player: "Player"):
         pass
 
     class ConsumableSprite(pygame.sprite.Sprite):
@@ -117,13 +102,38 @@ class Consumable(Item):
         return Consumable.ConsumableSprite(img_path)
 
 
+class Weapon(Item):
+    def __init__(self, name, description, ap, range, damage):
+        super().__init__(name, description)
+        self.ap = ap
+        self.range = range
+        self.damage = damage
+
+
+class DiamondSword(Weapon):
+    def __init__(self):
+        super().__init__('diamond sword', 'just a regular diamond sword', 1, 1, 10)
+
+    def get_sprite(self):
+        return self.create_sprite_from_pic("sword.png")
+
+    def consume(self, player: "Player"):
+        pass
+
+
+class Consumable(Item):
+    @abc.abstractmethod
+    def consume(self, player: "Player"):
+        pass
+
+
 class WhiteMonster(Consumable):
     def __init__(self):
         super().__init__(name="White Monster", description="Doubles your maximum amount of action points")
 
     def consume(self, player: "Player"):
         player.ap.max *= 2
-        print(player.ap.max)
+        # print(player.ap.max)
         player.inventory.remove(self)
 
     def get_sprite(self):

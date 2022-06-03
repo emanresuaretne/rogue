@@ -15,20 +15,20 @@ game_folder = Path(__file__).parent
 img_folder = game_folder / 'img'
 
 
-class PlayerState(Enum):
-    IDLE = auto()
-    LEFT = auto()
-    RIGHT = auto()
-    UP = auto()
-    DOWN = auto()
+class CharacterState(Enum):
+    IDLE = "IDLE"
+    LEFT = "LEFT"
+    RIGHT = "RIGHT"
+    UP = "UP"
+    DOWN = "DOWN"
 
 
 single_step_dict = {
-    PlayerState.IDLE: np.array([0, 0]),
-    PlayerState.UP: np.array([0, -PIXEL_STEP]),
-    PlayerState.LEFT: np.array([-PIXEL_STEP, 0]),
-    PlayerState.DOWN: np.array([0, PIXEL_STEP]),
-    PlayerState.RIGHT: np.array([PIXEL_STEP, 0]),
+    CharacterState.IDLE: np.array([0, 0]),
+    CharacterState.UP: np.array([0, -PIXEL_STEP]),
+    CharacterState.LEFT: np.array([-PIXEL_STEP, 0]),
+    CharacterState.DOWN: np.array([0, PIXEL_STEP]),
+    CharacterState.RIGHT: np.array([PIXEL_STEP, 0]),
 }
 
 
@@ -42,6 +42,34 @@ class ZoneType(Enum):
     CD = auto()
     RD = auto()
     CC = auto()
+
+
+class Outline(pygame.sprite.Sprite):
+    def __init__(self):
+        pygame.sprite.Sprite.__init__(self)
+        self.image = pygame.image.load(os.path.join(img_folder, 'frame0.png')).convert()
+        self.image.set_colorkey((0, 0, 0))
+        self.rect = self.image.get_rect()
+        self.rect.topleft = (0, 0)
+        self.surf = pygame.Surface((1000, 1000))
+
+
+class APFrame(pygame.sprite.Sprite):
+    def __init__(self):
+        pygame.sprite.Sprite.__init__(self)
+        self.image = pygame.image.load(os.path.join(img_folder, 'apframe.png')).convert()
+        self.image.set_colorkey((255, 255, 255))
+        self.rect = self.image.get_rect()
+        self.rect.topleft = (25, 25)
+
+
+class HPFrame(pygame.sprite.Sprite):
+    def __init__(self):
+        pygame.sprite.Sprite.__init__(self)
+        self.image = pygame.image.load(os.path.join(img_folder, 'hpframe.png')).convert()
+        self.image.set_colorkey((0, 0, 0))
+        self.rect = self.image.get_rect()
+        self.rect.topright = (975, 25)
 
 
 class MovableSprite(ABC, pygame.sprite.Sprite):
@@ -93,21 +121,12 @@ class MovableSprite(ABC, pygame.sprite.Sprite):
         return pygame.image.load(choice).convert()
 
 
-# class Frame(pygame.sprite.Sprite):
-#     def __init__(self, game):
-#         pygame.sprite.Sprite.__init__(self)
-#         self.game = game
-#         self.image = img_folder / 'frame1.png'
-#         self.rect = self.image.get_rect()
-#         self.rect.topleft = (25, 0)
-#         self.surf = pygame.Surface((950, 25))
-
-
 class Player(MovableSprite):
     def __init__(self, game):
-        self.__player_img = pygame.image.load(os.path.join(img_folder, 'player1.png')).convert()
-        self.__player_img.set_colorkey((0, 0, 0))
+        self.__player_img = pygame.image.load(os.path.join(img_folder, f'player_Idle_0.png')).convert()
+        self.__player_img.set_colorkey((255, 255, 255))
         MovableSprite.__init__(self, 1, 1, game)
+        self.i = 0
 
     def get_local_relative_shift(self, region, state):
         vector = single_step_dict[state].copy()
@@ -120,7 +139,16 @@ class Player(MovableSprite):
         return vector
 
     def get_image(self):
-        return self.__player_img
+        img = pygame.image.load(os.path.join(img_folder, f'player_{self.state.name}_{self.moves_count % 2}.png')).convert()
+        img.set_colorkey((255, 255, 255))
+        return img
+
+    def update(self):
+        super().update()
+        self.i = 1 - self.i
+        if self.state == CharacterState.IDLE:
+            self.image = pygame.image.load(os.path.join(img_folder, f'player_{self.state.name}_{self.i}.png')).convert()
+            self.image.set_colorkey((255, 255, 255))
 
 
 class AmbientSprite(MovableSprite):
@@ -136,6 +164,40 @@ class AmbientSprite(MovableSprite):
 
     def get_image(self):
         return self.get_random_pic_by_name()
+
+    def check_click(self, mouse):
+        return self.rect.collidepoint(mouse)
+
+
+class EnemySprite(AmbientSprite):
+    state: CharacterState
+
+    def __init__(self, x, y, game):
+        colours = ['red', 'green', 'yellow', 'blue']
+        self.colour = random.choice(colours)
+        self.state = CharacterState.IDLE
+        super().__init__(x, y, game)
+        self.i = 0
+
+    def update(self):
+        if self.state == CharacterState.IDLE:
+            super().update()
+            self.i = 1 - self.i
+            self.image = pygame.image.load(
+                os.path.join(img_folder, f'{self.colour}_enemy_{self.state.name}_{self.i}.png')).convert()
+            self.image.set_colorkey((255, 255, 255))
+        else:
+            vector = single_step_dict[self.state].copy()
+            self.move_once(vector)
+
+    def check_click(self, mouse):
+        res = self.rect.collidepoint(mouse)
+        return res
+
+    def get_image(self):
+        img = pygame.image.load(os.path.join(img_folder, f'{self.colour}_enemy_{self.state.value.lower()}_0.png')).convert()
+        img.set_colorkey((255, 255, 255))
+        return img
 
 
 class Wall(AmbientSprite):

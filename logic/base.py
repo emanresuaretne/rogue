@@ -11,3 +11,7 @@ class BaseObject(ABC):
     @abstractmethod
     def get_next_action(self):
         pass
+
+    @abstractmethod
+    def reset_ap(self):
+        pass
