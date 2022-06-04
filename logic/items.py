@@ -29,7 +29,7 @@ class Frame(pygame.sprite.Sprite):
             self.image.set_alpha(255)
 
     def get_image(self):
-        return pygame.image.load(sprites.img_folder / "frame.png").convert()
+        return pygame.image.load(sprites.img_folder / "new_frame.png").convert()
 
 
 class Inventory:

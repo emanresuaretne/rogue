@@ -117,7 +117,7 @@ class Game:
             for x in range(s):
                 if not y or y == s - 1 or not x or x == s - 1:
                     world_map[x][y] = Wall(x, y, self)
-                elif y == 1 and x == 1:
+                elif (y == 2 or y == 1) and x == 1:
                     world_map[x][y] = Floor(x, y, self)
                 else:
                     ii = 1
